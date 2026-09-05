@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+
+jobs:
+  guard:
+    name: No production drawings in the tree
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fail on any DXF over 200 KB
+        run: |
+          big=$(find . -name '*.dxf' -size +200k -not -path './target/*')
+          if [ -n "$big" ]; then
+            echo "These DXF files are too large to be synthetic fixtures:"; echo "$big"; exit 1
+          fi
+      - name: Fail on internal references
+        run: |
+          if grep -rIn --exclude-dir=.git --exclude-dir=target -E 'cad-app|gs://|fixtures-real' . | grep -v '^./.gitignore' | grep -v '^./.github/workflows/ci.yml'; then
+            echo "Internal references found"; exit 1
+          fi
+
+  test:
+    name: Test (${{ matrix.os }})
+    needs: guard
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Format
+        run: cargo fmt --all --check
+      - name: Clippy (all features)
+        run: cargo clippy --workspace --all-targets --all-features
+      - name: Test (default features)
+        run: cargo test --workspace
+      - name: Test (core only, no dxf/svg/parallel)
+        run: cargo test -p sheetnest --no-default-features
+      - name: Docs
+        run: cargo doc --workspace --no-deps --all-features
+
+  msrv:
+    name: MSRV (1.88)
+    needs: guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.88
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo check --workspace --all-features

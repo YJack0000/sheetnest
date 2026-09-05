@@ -1,0 +1,54 @@
+[package]
+name = "sheetnest"
+description = "2D nesting engine for sheet cutting: no-fit polygons + genetic algorithm, with DXF in/out and micro-joints"
+keywords = ["nesting", "dxf", "laser", "cnc", "geometry"]
+categories = ["algorithms", "science", "mathematics"]
+readme = "../../README.md"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[features]
+default = ["dxf", "svg", "parallel"]
+## Read parts from DXF and write the nested layout back out as DXF.
+dxf = ["dep:dxf"]
+## Render sheets as SVG for previews.
+svg = []
+## Evaluate the GA population on all cores with rayon. Turn off for wasm.
+parallel = ["dep:rayon"]
+
+[dependencies]
+anyhow = "1"
+clipper2 = "0.6"
+dashmap = "6"
+dxf = { version = "0.6", optional = true }
+rand = "0.10"
+rayon = { version = "1", optional = true }
+serde = { version = "1", features = ["derive"] }
+web-time = "1.1"
+
+[dev-dependencies]
+serde_json = "1"
+
+[[example]]
+name = "bench"
+required-features = ["dxf"]
+
+[[example]]
+name = "validate"
+required-features = ["dxf"]
+
+[[example]]
+name = "inspect"
+required-features = ["dxf"]
+
+[[example]]
+name = "nfp_probe"
+required-features = ["dxf"]
+
+[[example]]
+name = "gen_fixtures"
+required-features = ["dxf"]

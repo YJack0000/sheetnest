@@ -1,0 +1,14 @@
+[workspace]
+resolver = "3"
+members = ["crates/sheetnest"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/YJack0000/sheetnest"
+authors = ["YJack0000"]
+
+[profile.release]
+lto = "thin"
