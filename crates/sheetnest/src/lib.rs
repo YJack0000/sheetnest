@@ -41,6 +41,7 @@
 //! renders a sheet for preview. The `parallel` feature (on by default)
 //! evaluates the population on all cores with rayon.
 
+#[cfg(any(feature = "dxf", feature = "svg"))]
 mod chains;
 pub mod ga;
 pub mod geom;
@@ -53,7 +54,7 @@ pub mod dxf;
 #[cfg(feature = "svg")]
 pub mod svg;
 
-#[cfg(test)]
+#[cfg(all(test, any(feature = "dxf", feature = "svg")))]
 pub(crate) mod test_util;
 
 pub use ga::Hooks;
