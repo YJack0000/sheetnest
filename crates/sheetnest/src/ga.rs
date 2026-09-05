@@ -447,8 +447,7 @@ pub fn run_nest(parts: &[Part], cfg: &NestConfig, hooks: Hooks) -> anyhow::Resul
             }
         })
         .collect();
-    placements
-        .sort_by(|a, b| (a.sheet, a.part_id, a.instance).cmp(&(b.sheet, b.part_id, b.instance)));
+    placements.sort_by_key(|p| (p.sheet, p.part_id, p.instance));
 
     let sheets_used = best.placed.iter().map(|p| p.sheet + 1).max().unwrap_or(0);
     let net_placed: f64 = best
