@@ -249,7 +249,6 @@ dependencies = [
  "cfg-if",
  "libc",
  "r-efi",
- "rand_core",
 ]
 
 [[package]]
@@ -607,6 +606,28 @@ dependencies = [
  "serde",
  "serde_json",
  "web-time",
+]
+
+[[package]]
+name = "sheetnest-cli"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "sheetnest",
+]
+
+[[package]]
+name = "sheetnest-py"
+version = "0.1.0"
+dependencies = [
+ "sheetnest",
+]
+
+[[package]]
+name = "sheetnest-wasm"
+version = "0.1.0"
+dependencies = [
+ "sheetnest",
 ]
 
 [[package]]

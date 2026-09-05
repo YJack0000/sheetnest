@@ -1,0 +1,17 @@
+[package]
+name = "sheetnest-cli"
+description = "Command-line nesting for sheet cutting: nest DXF parts, validate layouts, benchmark"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "sheetnest"
+path = "src/main.rs"
+
+[dependencies]
+sheetnest = { path = "../sheetnest", version = "0.1.0" }
+anyhow = "1"

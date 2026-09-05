@@ -77,6 +77,27 @@ impl Hooks {
     }
 }
 
+/// Seed for an unseeded run. Wall clock nanoseconds mixed with a process
+/// counter and a stack address: plenty of variety between runs for a
+/// heuristic search, and no OS entropy syscall, so the core builds on
+/// wasm32-unknown-unknown without a `getrandom` backend.
+fn entropy_seed() -> u64 {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
+    let nanos = web_time::SystemTime::now()
+        .duration_since(web_time::UNIX_EPOCH)
+        .map(|d| d.as_nanos() as u64)
+        .unwrap_or(0);
+    let count = COUNTER.fetch_add(1, Ordering::Relaxed);
+    let local = 0u8;
+    let addr = std::ptr::addr_of!(local) as usize as u64;
+    // splitmix64 finalizer so nearby inputs land far apart.
+    let mut z = nanos ^ count.rotate_left(32) ^ addr.rotate_left(17);
+    z = (z ^ (z >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
+    z ^ (z >> 31)
+}
+
 /// Minimum fitness decrease that counts as an improvement.
 const IMPROVE_EPS: f64 = 1e-9;
 /// Overlap area threshold for the final sanity check, mm^2.
@@ -292,7 +313,7 @@ pub fn run_nest(parts: &[Part], cfg: &NestConfig, hooks: Hooks) -> anyhow::Resul
     let rotations = cfg.allowed_rotations();
     let n_rot = rotations.len();
     let cache = NfpCache::new();
-    let seed = cfg.seed.unwrap_or_else(rand::random::<u64>);
+    let seed = cfg.seed.unwrap_or_else(entropy_seed);
     let mut rng = StdRng::seed_from_u64(seed);
 
     // ---- initial population ------------------------------------------

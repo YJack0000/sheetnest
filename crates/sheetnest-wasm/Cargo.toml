@@ -1,0 +1,16 @@
+[package]
+name = "sheetnest-wasm"
+description = "WebAssembly bindings for sheetnest"
+publish = false
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+sheetnest = { path = "../sheetnest", default-features = false, features = ["dxf", "svg"] }
