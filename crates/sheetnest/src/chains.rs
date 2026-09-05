@@ -5,6 +5,7 @@ use crate::model::{NestConfig, Part, Seg};
 use crate::tabs;
 
 /// Chain endpoints closer than this are considered coincident.
+#[cfg(feature = "svg")]
 pub(crate) const CLOSE_TOL: f64 = 1e-6;
 
 /// |sweep| at or above this is a full circle and needs special handling
@@ -29,6 +30,7 @@ pub(crate) fn part_chains(part: &Part, cfg: &NestConfig) -> Vec<Vec<Seg>> {
 }
 
 /// A chain is closed when its last endpoint meets its first start point.
+#[cfg(feature = "svg")]
 pub(crate) fn chain_is_closed(chain: &[Seg]) -> bool {
     match (chain.first(), chain.last()) {
         (Some(f), Some(l)) => f.start().dist(&l.end()) < CLOSE_TOL,
