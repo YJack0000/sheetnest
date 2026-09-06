@@ -1,0 +1,33 @@
+[build-system]
+requires = ["maturin>=1.9,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "sheetnest"
+description = "2D nesting for sheet cutting: no-fit polygons + genetic algorithm, with DXF in/out and micro-joints"
+readme = "README.md"
+requires-python = ">=3.9"
+license = "MIT OR Apache-2.0"
+keywords = ["nesting", "dxf", "laser", "cnc", "cutting", "geometry"]
+authors = [{ name = "YJack0000" }]
+dynamic = ["version"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Manufacturing",
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Multimedia :: Graphics :: 3D Modeling",
+]
+
+[project.urls]
+Homepage = "https://github.com/YJack0000/sheetnest"
+Repository = "https://github.com/YJack0000/sheetnest"
+Issues = "https://github.com/YJack0000/sheetnest/issues"
+
+[tool.maturin]
+module-name = "sheetnest._sheetnest"
+python-source = "python"
+features = ["pyo3/abi3-py39"]
+strip = true

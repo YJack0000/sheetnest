@@ -34,14 +34,6 @@ web-time = "1.1"
 serde_json = "1"
 
 [[example]]
-name = "bench"
-required-features = ["dxf"]
-
-[[example]]
-name = "validate"
-required-features = ["dxf"]
-
-[[example]]
 name = "inspect"
 required-features = ["dxf"]
 

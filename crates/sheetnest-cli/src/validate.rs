@@ -1,8 +1,8 @@
-//! Independent logical validator for nesting results.
+//! `sheetnest validate` - an independent check on a nested DXF.
 //!
-//! Re-reads an output DXF produced by the engine and checks physical
-//! invariants WITHOUT trusting engine internals (entity->geometry
-//! conversion here is written independently of the parser's):
+//! Re-reads an output DXF and checks physical invariants WITHOUT trusting
+//! engine internals (the entity -> geometry conversion here is written
+//! independently of the parser's):
 //!
 //!   1. part count: number of top-level closed contours on layer CUT
 //!      matches the expected instance count (when given);
@@ -13,17 +13,50 @@
 //!      absorbs the engine's documented simplification tolerance);
 //!   4. tabs: with tabs off every CUT chain must close; with tabs on the
 //!      open-chain count is reported for eyeballing.
-//!
-//! Usage:
-//!   cargo run --release --example validate -- <result.dxf> [expectedInstances] [spacing=2] [margin=5]
 
+use std::path::PathBuf;
+
+use anyhow::{Context, Result, bail};
+use clap::Args;
 use dxf::Drawing;
 use dxf::entities::EntityType;
 use sheetnest::dxf::chain_segments;
 use sheetnest::geom::{inflate_ring, overlap_area};
 use sheetnest::model::{Contour, Pt, Seg, ring_bbox};
 
-const TOL: f64 = 0.6; // mm: simplification (2x0.25) + clipper grid slack
+use crate::opts::parse_sheet;
+
+/// mm: simplification (2x0.25) + clipper grid slack.
+const TOL: f64 = 0.6;
+
+/// Check a nested DXF for overlaps, edge clearance and gaps.
+///
+/// This reads the finished file back the way a cutter would and measures it,
+/// rather than asking the nester whether it did a good job. Exits non-zero
+/// when something is wrong.
+#[derive(Args, Debug)]
+pub struct ValidateArgs {
+    /// The nested DXF to check.
+    #[arg(value_name = "FILE")]
+    pub file: PathBuf,
+
+    /// How many part instances the file should contain. Checked when given.
+    #[arg(long, value_name = "N")]
+    pub expect: Option<usize>,
+
+    /// The gap between parts the job was cut with, mm.
+    #[arg(long, value_name = "MM", default_value_t = 2.0)]
+    pub spacing: f64,
+
+    /// The gap to the sheet edge the job was cut with, mm.
+    #[arg(long, value_name = "MM", default_value_t = 5.0)]
+    pub margin: f64,
+
+    /// Sheet size the job was cut on, as WIDTHxHEIGHT in mm. When given,
+    /// every sheet outline in the file is measured against it.
+    #[arg(long, value_name = "WxH", value_parser = parse_sheet)]
+    pub sheet: Option<(f64, f64)>,
+}
 
 fn seg_from_entity(et: &EntityType) -> Option<Seg> {
     match et {
@@ -71,17 +104,10 @@ fn point_in_ring(p: &Pt, ring: &[Pt]) -> bool {
     inside
 }
 
-fn main() {
-    let mut args = std::env::args().skip(1);
-    let path = args.next().unwrap_or_else(|| {
-        eprintln!("usage: validate <result.dxf> [expectedInstances] [spacing] [margin]");
-        std::process::exit(2);
-    });
-    let expected: Option<usize> = args.next().and_then(|s| s.parse().ok());
-    let spacing: f64 = args.next().and_then(|s| s.parse().ok()).unwrap_or(2.0);
-    let margin: f64 = args.next().and_then(|s| s.parse().ok()).unwrap_or(5.0);
-
-    let drawing = Drawing::load_file(&path).expect("load result dxf");
+pub fn run(args: ValidateArgs) -> Result<()> {
+    let (spacing, margin) = (args.spacing, args.margin);
+    let drawing = Drawing::load_file(&args.file)
+        .with_context(|| format!("loading {}", args.file.display()))?;
 
     // --- collect geometry by layer -------------------------------------
     let mut cut_segs: Vec<Seg> = Vec::new();
@@ -104,7 +130,9 @@ fn main() {
             _ => {}
         }
     }
-    assert!(!sheet_rects.is_empty(), "no SHEET rectangles found");
+    if sheet_rects.is_empty() {
+        bail!("no SHEET rectangles found in {}", args.file.display());
+    }
 
     // --- micro-joint (tab) gap detection --------------------------------
     // A tab shows up as a pair of seg endpoints facing each other across a
@@ -159,8 +187,19 @@ fn main() {
 
     let mut violations = 0usize;
 
+    // --- 0. sheet size, when the caller told us what it should be ------
+    if let Some((sw, sh)) = args.sheet {
+        for (si, (x0, y0, x1, y1)) in sheet_rects.iter().enumerate() {
+            let (w, h) = (x1 - x0, y1 - y0);
+            if (w - sw).abs() > TOL || (h - sh).abs() > TOL {
+                println!("VIOLATION: sheet #{si} measures {w:.1}x{h:.1}, expected {sw:.1}x{sh:.1}");
+                violations += 1;
+            }
+        }
+    }
+
     // --- 1. expected count ---------------------------------------------
-    if let Some(exp) = expected
+    if let Some(exp) = args.expect
         && top_level.len() != exp
     {
         println!(
@@ -235,6 +274,7 @@ fn main() {
     println!("--------------------------------------------------------------");
     if violations == 0 {
         println!("VALIDATION PASSED (worst overlap {worst_overlap:.4} mm^2)");
+        Ok(())
     } else {
         println!("VALIDATION FAILED: {violations} violation(s)");
         std::process::exit(1);

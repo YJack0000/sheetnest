@@ -17,3 +17,9 @@ All notable changes to this project are documented here. The format follows
 - `NestSolution::sheet_width` / `sheet_height` and `render_config`, so
   renderers draw auto-width results at the width actually reached.
 - Cargo features `dxf`, `svg`, `parallel`.
+- `sheetnest-cli` (`sheetnest nest | validate | bench`).
+- Python package `sheetnest` (PyO3, abi3 wheels) with GIL release, progress
+  and cancellation hooks, Ctrl-C support.
+- npm package `sheetnest` (wasm-bindgen; Node and browser via `exports`).
+- The unseeded RNG seed comes from the clock and a counter instead of OS
+  entropy, so the core builds for wasm32 without a `getrandom` backend.

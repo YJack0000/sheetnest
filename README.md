@@ -110,12 +110,57 @@ without these, which is what the wasm build uses.
 `NestConfig` (de)serializes with serde as camelCase JSON, so the same
 document configures the Rust, Python and JavaScript APIs.
 
-## Python and JavaScript
+## Command line
 
-Bindings are on the way: `pip install sheetnest` (PyO3, native wheels) and
-`npm install sheetnest` (WebAssembly, single-threaded, meant to run in a
-Worker). They expose the same `Part` / `NestConfig` / `nest()` shape as
-the Rust API. See the [roadmap](#roadmap).
+```bash
+cargo install sheetnest-cli
+sheetnest nest bracket.dxf:12 gusset.dxf:4 plate.dxf --sheet 2500x1250 --tabs -o job.dxf --svg job.svg
+sheetnest validate job.dxf        # independent overlap / margin / gap checker
+sheetnest bench fixtures/ 3       # nest every DXF in a directory, print metrics
+```
+
+Every `NestConfig` field has a flag (`--auto-width`, `--spacing`, `--rotation free`,
+`--seed`, ...); `--config settings.json` loads a camelCase config file and flags
+override it; `--json` prints the full solution. See
+[crates/sheetnest-cli](crates/sheetnest-cli/README.md).
+
+## Python
+
+```bash
+pip install sheetnest
+```
+
+```python
+from pathlib import Path
+from sheetnest import NestConfig, Part, nest
+
+parts, warnings = Part.from_dxf(Path("bracket.dxf").read_bytes(), "bracket", quantity=12)
+parts.append(Part.from_polygon("plate", 4, [(0, 0), (120, 0), (120, 80), (0, 80)]))
+
+solution = nest(
+    parts,
+    NestConfig(sheet_width=1829, sheet_height=914, spacing=2, margin=5, seed=1),
+    on_progress=lambda p: print(p.generation, p.best_utilization),
+)
+print(solution.stats.placed, "of", solution.stats.total, "placed on", solution.stats.sheets_used, "sheet(s)")
+Path("nested.dxf").write_bytes(solution.to_dxf())
+```
+
+The GIL is released while the optimizer runs, Ctrl-C cancels and keeps the
+best layout so far, and `should_stop=` lets you cancel from code. Wheels are
+abi3 (CPython 3.9+) for Linux x86_64/aarch64, macOS arm64/x86_64 and Windows
+x64. See [crates/sheetnest-py](crates/sheetnest-py/README.md).
+
+## JavaScript / WebAssembly
+
+```bash
+npm install sheetnest
+```
+
+Same `Part` / `nest()` / `Solution` shape, config as a camelCase object,
+single-threaded, meant to run inside a Web Worker (a nest blocks for
+`timeLimitMs`). Node and browsers are both supported through the package
+`exports`. See [crates/sheetnest-wasm](crates/sheetnest-wasm/README.md).
 
 ## How it works
 
@@ -144,9 +189,9 @@ measured on real production parts. The short version:
 
 ```bash
 cargo run --release --example gen_fixtures          # synthetic DXF parts into fixtures/
-cargo run --release --example bench -- fixtures 3   # nest them, print metrics
-cargo run --release --example validate -- out.dxf   # independent overlap/margin/gap checker
 cargo run --release --example inspect -- part.dxf   # what the parser sees
+cargo run --release -p sheetnest-cli -- bench fixtures 3     # nest them, print metrics
+cargo run --release -p sheetnest-cli -- validate out.dxf     # independent overlap/margin/gap checker
 ```
 
 ## Limitations
@@ -155,13 +200,14 @@ cargo run --release --example inspect -- part.dxf   # what the parser sees
 - Free rotation with many angles is slow on spline-heavy parts (each
   angle pair needs its own NFP); orthogonal mode is the fast path.
 - The geometry kernel is Clipper2 (C++), so a C++ toolchain is needed to
-  build from source. Published wheels and the wasm package are prebuilt.
+  build from source (and the WASI SDK for the wasm target). Published wheels
+  and the npm package are prebuilt.
 
 ## Roadmap
 
-- [ ] `sheetnest-cli`: `nest`, `validate`, `bench` subcommands
-- [ ] Python package (PyO3 + maturin)
-- [ ] npm package (wasm-bindgen)
+- [x] `sheetnest-cli`: `nest`, `validate`, `bench` subcommands
+- [x] Python package (PyO3 + maturin)
+- [x] npm package (wasm-bindgen)
 - [ ] Nest small parts inside large parts' holes
 - [ ] Multi-start: several short GA runs beat one long one on this landscape
 

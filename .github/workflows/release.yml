@@ -1,0 +1,147 @@
+name: Release
+
+# Tag `vX.Y.Z` (matching [workspace.package] version) to publish everything.
+# Order matters: the Rust crates go first, then the two bindings, and any
+# failure stops the chain so the three registries never disagree on the
+# version. Secrets needed (repo settings → Secrets and variables → Actions):
+#   CARGO_REGISTRY_TOKEN  crates.io API token (publish scope for both crates)
+#   NPM_TOKEN             npm automation token with publish rights to `sheetnest`
+# PyPI uses trusted publishing (no token): register this repo + workflow
+# file + environment `pypi` on pypi.org once, under the `sheetnest` project.
+
+on:
+  push:
+    tags: ["v*"]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check-version:
+    name: Tag matches Cargo version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          tag="${GITHUB_REF_NAME#v}"
+          ver=$(grep -m1 '^version = ' Cargo.toml | sed 's/.*"\(.*\)"/\1/')
+          if [ "$tag" != "$ver" ]; then
+            echo "tag v$tag does not match workspace version $ver"; exit 1
+          fi
+
+  crates:
+    name: Publish to crates.io
+    needs: check-version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Publish sheetnest
+        run: cargo publish -p sheetnest --locked
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+      - name: Wait for the index
+        run: |
+          ver=$(grep -m1 '^version = ' Cargo.toml | sed 's/.*"\(.*\)"/\1/')
+          for i in $(seq 1 30); do
+            if cargo search sheetnest --limit 1 | grep -q "^sheetnest = \"$ver\""; then exit 0; fi
+            sleep 10
+          done
+          echo "sheetnest $ver not visible on crates.io after 5 minutes"; exit 1
+      - name: Publish sheetnest-cli
+        run: cargo publish -p sheetnest-cli --locked
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+  wheels:
+    name: Wheels (${{ matrix.os }} ${{ matrix.target }})
+    needs: check-version
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest,  target: x86_64,  manylinux: auto }
+          - { os: ubuntu-latest,  target: aarch64, manylinux: auto }
+          - { os: macos-latest,   target: aarch64 }
+          - { os: macos-13,       target: x86_64 }
+          - { os: windows-latest, target: x64 }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: PyO3/maturin-action@v1
+        with:
+          working-directory: crates/sheetnest-py
+          target: ${{ matrix.target }}
+          manylinux: ${{ matrix.manylinux }}
+          args: --release --out dist
+          sccache: "true"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ matrix.os }}-${{ matrix.target }}
+          path: crates/sheetnest-py/dist
+
+  sdist:
+    name: sdist
+    needs: check-version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: PyO3/maturin-action@v1
+        with:
+          working-directory: crates/sheetnest-py
+          command: sdist
+          args: --out dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-sdist
+          path: crates/sheetnest-py/dist
+
+  pypi:
+    name: Publish to PyPI
+    needs: [crates, wheels, sdist]
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: wheels-*
+          merge-multiple: true
+          path: dist
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist
+
+  npm:
+    name: Publish to npm
+    needs: [crates]
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      - name: Install wasm-pack
+        run: cargo install wasm-pack --locked
+      - name: Build package
+        run: crates/sheetnest-wasm/scripts/build.sh
+      - name: Test package
+        run: node --test crates/sheetnest-wasm/tests/node
+      - name: Publish
+        run: npm publish --provenance --access public
+        working-directory: crates/sheetnest-wasm/pkg
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
