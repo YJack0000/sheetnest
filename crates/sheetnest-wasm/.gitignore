@@ -1,0 +1,6 @@
+# Downloaded toolchains (WASI SDK, wasm-pack) — see scripts/build.sh
+.tmp/
+# wasm-pack output
+pkg/
+# `sheetnest` self-link used by the Node tests
+node_modules/

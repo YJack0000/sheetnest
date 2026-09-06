@@ -1,0 +1,9 @@
+{
+  "name": "sheetnest-wasm-dev",
+  "private": true,
+  "description": "Dev harness for the sheetnest npm package. The published manifest is npm/package.json; scripts/build.sh copies it into pkg/.",
+  "scripts": {
+    "build": "./scripts/build.sh",
+    "test": "node --test tests/node/*.test.mjs"
+  }
+}

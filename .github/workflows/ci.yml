@@ -81,21 +81,36 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-unknown-unknown
+          components: clippy
       - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ". -> target/wasm"
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Cache WASI SDK
-        uses: actions/cache@v4
+      # WASI SDK + wasm-pack + wasm-bindgen are ~300 MB of downloads;
+      # scripts/build.sh fetches them into .tmp on a cache miss.
+      - uses: actions/cache@v4
         with:
           path: crates/sheetnest-wasm/.tmp
-          key: wasi-sdk-24-${{ runner.os }}-${{ runner.arch }}
-      - name: Install wasm-pack
-        run: npm install -g wasm-pack
-      - name: Build
+          key: wasm-toolchains-wasi24-wp0.15.0-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - name: Build package
         run: crates/sheetnest-wasm/scripts/build.sh
-      - name: Test
-        run: node --test crates/sheetnest-wasm/tests/node
+      - name: Test package
+        run: node --test tests/node/*.test.mjs
+        working-directory: crates/sheetnest-wasm
+      - name: Clippy (wasm32)
+        working-directory: crates/sheetnest-wasm
+        run: |
+          SDK="$PWD/.tmp/wasi-sdk-24.0-x86_64-linux"
+          export CC_wasm32_unknown_unknown="$SDK/bin/clang" \
+                 CXX_wasm32_unknown_unknown="$SDK/bin/clang++" \
+                 AR_wasm32_unknown_unknown="$SDK/bin/llvm-ar" \
+                 CFLAGS_wasm32_unknown_unknown=--target=wasm32-wasip1 \
+                 CXXFLAGS_wasm32_unknown_unknown=--target=wasm32-wasip1 \
+                 CXXSTDLIB_wasm32_unknown_unknown="" \
+                 CARGO_TARGET_DIR="$GITHUB_WORKSPACE/target/wasm"
+          cargo clippy -p sheetnest-wasm --target wasm32-unknown-unknown -- -D warnings
 
   msrv:
     name: MSRV (1.88)

@@ -1,0 +1,60 @@
+{
+  "name": "sheetnest",
+  "version": "0.0.0-workspace",
+  "description": "2D nesting for sheet cutting: no-fit polygons + genetic algorithm, with DXF in/out and micro-joints. WebAssembly build of the Rust sheetnest engine.",
+  "type": "module",
+  "license": "MIT OR Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/YJack0000/sheetnest.git"
+  },
+  "homepage": "https://github.com/YJack0000/sheetnest#readme",
+  "bugs": "https://github.com/YJack0000/sheetnest/issues",
+  "keywords": [
+    "nesting",
+    "dxf",
+    "laser",
+    "cnc",
+    "cutting",
+    "geometry",
+    "wasm",
+    "webassembly"
+  ],
+  "sideEffects": [
+    "./web/sheetnest.js",
+    "./node/sheetnest.js"
+  ],
+  "types": "./node/sheetnest.d.ts",
+  "main": "./node/sheetnest.js",
+  "module": "./web/sheetnest.js",
+  "browser": "./web/sheetnest.js",
+  "exports": {
+    ".": {
+      "types": "./node/sheetnest.d.ts",
+      "node": {
+        "require": "./node/sheetnest.js",
+        "default": "./node/sheetnest.js"
+      },
+      "default": "./web/sheetnest.js"
+    },
+    "./web": {
+      "types": "./web/sheetnest.d.ts",
+      "default": "./web/sheetnest.js"
+    },
+    "./node": {
+      "types": "./node/sheetnest.d.ts",
+      "default": "./node/sheetnest.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "node",
+    "web",
+    "README.md",
+    "LICENSE-MIT",
+    "LICENSE-APACHE"
+  ],
+  "engines": {
+    "node": ">=18"
+  }
+}

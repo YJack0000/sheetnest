@@ -134,12 +134,15 @@ jobs:
         with:
           node-version: 22
           registry-url: https://registry.npmjs.org
-      - name: Install wasm-pack
-        run: cargo install wasm-pack --locked
+      - uses: actions/cache@v4
+        with:
+          path: crates/sheetnest-wasm/.tmp
+          key: wasm-toolchains-wasi24-wp0.15.0-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
       - name: Build package
         run: crates/sheetnest-wasm/scripts/build.sh
       - name: Test package
-        run: node --test crates/sheetnest-wasm/tests/node
+        run: node --test tests/node/*.test.mjs
+        working-directory: crates/sheetnest-wasm
       - name: Publish
         run: npm publish --provenance --access public
         working-directory: crates/sheetnest-wasm/pkg

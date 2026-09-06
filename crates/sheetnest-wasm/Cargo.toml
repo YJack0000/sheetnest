@@ -14,3 +14,14 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 sheetnest = { path = "../sheetnest", default-features = false, features = ["dxf", "svg"] }
+
+console_error_panic_hook = "0.1"
+js-sys = "0.3"
+serde-wasm-bindgen = "0.6"
+wasm-bindgen = "0.2"
+
+# Not used directly: `dxf` -> `uuid` with the `v4` feature needs an RNG
+# backend, and on wasm32 none of uuid's defaults apply. `js` wires it to
+# crypto.getRandomValues. (The core itself needs no getrandom: it seeds its
+# GA from the wall clock.)
+uuid = { version = "1", features = ["js"] }

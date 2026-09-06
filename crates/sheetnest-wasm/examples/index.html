@@ -1,0 +1,99 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>sheetnest browser example</title>
+<style>
+  body { font: 14px/1.5 system-ui, sans-serif; margin: 2rem; max-width: 60rem; }
+  fieldset { border: 1px solid #ccc; margin-bottom: 1rem; }
+  label { margin-right: 1rem; }
+  input[type="number"] { width: 6rem; }
+  #log { font-family: ui-monospace, monospace; white-space: pre-wrap; min-height: 3rem; }
+  #preview svg { max-width: 100%; height: auto; border: 1px solid #ddd; }
+</style>
+
+<h1>sheetnest</h1>
+
+<fieldset>
+  <legend>Input</legend>
+  <label>DXF <input id="file" type="file" accept=".dxf" /></label>
+  <label>Quantity <input id="qty" type="number" value="8" min="1" /></label>
+  <label>Sheet <input id="w" type="number" value="1829" /> ×
+    <input id="h" type="number" value="914" /> mm</label>
+  <label>Time limit <input id="ms" type="number" value="10000" step="1000" /> ms</label>
+  <label><input id="tabs" type="checkbox" /> micro-joints</label>
+</fieldset>
+
+<button id="run" disabled>Nest</button>
+<button id="cancel" disabled>Cancel</button>
+<a id="download" hidden download="nested.dxf">Download DXF</a>
+
+<div id="log">Pick a DXF file to start.</div>
+<div id="preview"></div>
+
+<script type="module">
+  const $ = (id) => document.getElementById(id);
+  const worker = new Worker(new URL("./worker.js", import.meta.url), { type: "module" });
+  let dxf = null;
+  let url = null;
+
+  $("file").onchange = async (e) => {
+    const f = e.target.files[0];
+    if (!f) return;
+    dxf = { bytes: await f.arrayBuffer(), name: f.name };
+    $("run").disabled = false;
+    $("log").textContent = `${f.name}, ${f.size} bytes. Ready.`;
+  };
+
+  $("run").onclick = () => {
+    $("run").disabled = true;
+    $("cancel").disabled = false;
+    $("download").hidden = true;
+    $("preview").innerHTML = "";
+    $("log").textContent = "Nesting…";
+    worker.postMessage(
+      {
+        type: "nest",
+        dxf: dxf.bytes.slice(0), // the worker takes ownership of its copy
+        name: dxf.name,
+        quantity: +$("qty").value,
+        config: {
+          sheetWidth: +$("w").value,
+          sheetHeight: +$("h").value,
+          timeLimitMs: +$("ms").value,
+          tabs: { enabled: $("tabs").checked },
+        },
+      },
+      [],
+    );
+  };
+
+  $("cancel").onclick = () => worker.postMessage({ type: "cancel" });
+
+  worker.onmessage = ({ data }) => {
+    if (data.type === "progress") {
+      $("log").textContent =
+        `generation ${data.generation} · ` +
+        `utilization ${(data.bestUtilization * 100).toFixed(1)}% · ` +
+        `${(data.elapsedMs / 1000).toFixed(1)}s`;
+      return;
+    }
+    $("run").disabled = false;
+    $("cancel").disabled = true;
+
+    if (data.type === "error") {
+      $("log").textContent = `Error: ${data.message}`;
+      return;
+    }
+    const s = data.stats;
+    $("log").textContent =
+      `${s.placed}/${s.total} placed on ${s.sheetsUsed} sheet(s) · ` +
+      `${(s.utilization * 100).toFixed(1)}% utilization · ` +
+      `${s.generations} generations · stopped: ${s.stopReason}` +
+      (data.warnings.length ? `\n${data.warnings.join("\n")}` : "");
+    $("preview").innerHTML = data.svg;
+
+    if (url) URL.revokeObjectURL(url);
+    url = URL.createObjectURL(new Blob([data.dxf], { type: "application/dxf" }));
+    $("download").href = url;
+    $("download").hidden = false;
+  };
+</script>
