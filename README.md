@@ -1,5 +1,9 @@
 # sheetnest
 
+<p align="center">
+  <img src="docs/poster.svg" alt="sheetnest: 20 parts nested on a 436 by 400 mm sheet at 69% utilization, with the Rust, Python, JavaScript and CLI packages and the DXF in, NFP + GA, micro-joints, DXF/SVG out pipeline" width="100%">
+</p>
+
 2D nesting for sheet cutting: pack parts onto rectangular stock with as
 little waste as possible, and hand the cutter a DXF it can use as-is.
 
