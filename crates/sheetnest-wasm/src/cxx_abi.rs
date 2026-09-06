@@ -2,11 +2,12 @@
 //!
 //! `clipper2` -> `clipper2c-sys` compiles Clipper2 with the WASI SDK's
 //! `clang++` against the libc++ headers, because `wasm32-unknown-unknown` has
-//! no C++ standard library of its own. That leaves a handful of undefined
-//! symbols in the archive. Linking WASI's `libc++`/`libc` to satisfy them
-//! pulls in `wasi_snapshot_preview1` imports (`fd_write`, `proc_exit`, …) that
-//! a browser cannot provide, so instead the few symbols the kernel actually
-//! reaches for are defined here, on top of Rust's own allocator.
+//! no C++ standard library of its own. It is compiled with `-fno-exceptions
+//! -fno-rtti` (see `scripts/build.sh`), so the only libc++ symbols left in
+//! the archive are `operator new` / `operator delete`. Linking WASI's
+//! `libc++`/`libc` to satisfy them would pull in `wasi_snapshot_preview1`
+//! imports (`fd_write`, `proc_exit`, …) that a browser cannot provide, so
+//! they are defined here on top of Rust's own allocator instead.
 //!
 //! `scripts/build.sh` fails the build if the finished `.wasm` still imports
 //! anything from the `env` module, so a Clipper2 or toolchain bump that starts
@@ -96,46 +97,11 @@ extern "C" fn _ZdaPv(ptr: *mut u8) {
     unsafe { cxx_free(ptr) }
 }
 
-// ---- the throw path -------------------------------------------------------
-// A C++ exception cannot cross the `extern "C"` boundary into Rust anyway, so
-// the whole path ends in a panic: with the panic hook installed that surfaces
-// as a readable `console.error` instead of a bare `unreachable` trap.
+// ---- std::nothrow -----------------------------------------------------------
+// `new (std::nothrow) T` takes the address of this empty tag object; libc++
+// defines it in the library, not the headers, so it has to live here.
 
+/// `std::nothrow` (a `const std::nothrow_t`, one byte, never read)
 #[unsafe(no_mangle)]
-extern "C" fn __cxa_allocate_exception(size: usize) -> *mut u8 {
-    cxx_alloc(size)
-}
-
-#[unsafe(no_mangle)]
-extern "C" fn __cxa_throw(_exception: *mut u8, _type_info: *mut u8, _dtor: *mut u8) -> ! {
-    panic!("clipper2 raised a C++ exception; the geometry kernel cannot continue");
-}
-
-// Constructors and destructors for the exception types Clipper2's containers
-// can throw. They only ever run on the way to `__cxa_throw` above, which never
-// returns, so nothing observes the object they leave behind.
-
-/// `std::logic_error::logic_error(const char*)`
-#[unsafe(no_mangle)]
-#[allow(non_snake_case)]
-extern "C" fn _ZNSt11logic_errorC2EPKc(_this: *mut u8, _what: *const u8) {}
-
-/// `std::length_error::~length_error()`
-#[unsafe(no_mangle)]
-#[allow(non_snake_case)]
-extern "C" fn _ZNSt12length_errorD1Ev(_this: *mut u8) {}
-
-/// `std::bad_array_new_length::bad_array_new_length()`
-#[unsafe(no_mangle)]
-#[allow(non_snake_case)]
-extern "C" fn _ZNSt20bad_array_new_lengthC1Ev(_this: *mut u8) {}
-
-/// `std::bad_array_new_length::~bad_array_new_length()`
-#[unsafe(no_mangle)]
-#[allow(non_snake_case)]
-extern "C" fn _ZNSt20bad_array_new_lengthD1Ev(_this: *mut u8) {}
-
-/// `std::__2::bad_function_call::~bad_function_call()`
-#[unsafe(no_mangle)]
-#[allow(non_snake_case)]
-extern "C" fn _ZNSt3__217bad_function_callD1Ev(_this: *mut u8) {}
+#[allow(non_upper_case_globals)]
+pub static _ZSt7nothrow: u8 = 0;

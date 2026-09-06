@@ -96,7 +96,13 @@ export CC_wasm32_unknown_unknown="$WASI_SDK/bin/clang"
 export CXX_wasm32_unknown_unknown="$WASI_SDK/bin/clang++"
 export AR_wasm32_unknown_unknown="$WASI_SDK/bin/llvm-ar"
 export CFLAGS_wasm32_unknown_unknown="--target=wasm32-wasip1"
-export CXXFLAGS_wasm32_unknown_unknown="--target=wasm32-wasip1"
+# No exceptions, no RTTI: Clipper2 guards every `throw` behind
+# __cpp_exceptions (DoError becomes a no-op), and without them the archive
+# stops referencing libc++abi's typeinfo, vtables and unwinder — the whole
+# class of symbols that otherwise has to be faked in src/cxx_abi.rs. libc++'s
+# own abort path is a variadic function no stable Rust can define, so it is
+# redirected to a trap at the preprocessor level.
+export CXXFLAGS_wasm32_unknown_unknown="--target=wasm32-wasip1 -fno-exceptions -fno-rtti -D_LIBCPP_VERBOSE_ABORT(...)=__builtin_trap()"
 # The `cc` crate emits `-lstdc++` for any target it does not recognise, and
 # wasm32-unknown-unknown has no such library. Empty means "link no C++ stdlib":
 # what clipper2c needs is already in the archive the WASI SDK produced.

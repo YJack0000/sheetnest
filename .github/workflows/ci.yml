@@ -107,7 +107,7 @@ jobs:
                  CXX_wasm32_unknown_unknown="$SDK/bin/clang++" \
                  AR_wasm32_unknown_unknown="$SDK/bin/llvm-ar" \
                  CFLAGS_wasm32_unknown_unknown=--target=wasm32-wasip1 \
-                 CXXFLAGS_wasm32_unknown_unknown=--target=wasm32-wasip1 \
+                 CXXFLAGS_wasm32_unknown_unknown="--target=wasm32-wasip1 -fno-exceptions -fno-rtti -D_LIBCPP_VERBOSE_ABORT(...)=__builtin_trap()" \
                  CXXSTDLIB_wasm32_unknown_unknown="" \
                  CARGO_TARGET_DIR="$GITHUB_WORKSPACE/target/wasm"
           cargo clippy -p sheetnest-wasm --target wasm32-unknown-unknown -- -D warnings
